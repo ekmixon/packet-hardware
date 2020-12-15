@@ -119,6 +119,29 @@ def get_smart_devices():
     return smart_map
 
 
+def get_boss_disks():
+    boss_disks = cmd_output(
+        "/opt/dell/srvadmin/bin/idracadm7", "storage", "get", "pdisks"
+    )
+    # Disk.Direct.0-0:AHCI.Slot.1-1
+    # Disk.Direct.1-1:AHCI.Slot.1-1
+    disk_map = {}
+
+    disks = []
+
+    counter = 0
+
+    comment_regex = re.compile("^#")
+    for line in boss_disks.splitlines():
+        if comment_regex.match(line):
+            continue
+
+        disk_map[disks[counter]] = disk_type
+        counter += 1
+
+    return disk_map
+
+
 def get_nvme_attributes(device):
     smartctl_json = cmd_output("smartctl", "--all", "--json", device)
     return json.loads(smartctl_json)["nvme_smart_health_information_log"]
@@ -206,6 +229,27 @@ def get_hdparm_diskprop(device, prop):
     hdparm_data = cmd_output("hdparm", "-I", device)
 
     return __re_multiline_first(hdparm_data, regex[prop]).strip()
+
+
+def get_dellboss_diskprop(device, prop):
+    regex = {
+        "model": re.compile(r"^\s+ProductId:\s=\s+(.*)$", re.MULTILINE),
+        "serial": re.compile(r"^\s+SerialNumber\s=\s+(.*)$", re.MULTILINE),
+        "firmware_version": re.compile(r"^\s+Revision\s=\s+(.*)$", re.MULTILINE),
+    }
+
+    if prop not in regex:
+        return ""
+
+    boss_data = cmd_output(
+        "/opt/dell/srvadmin/bin/idracadm7",
+        "storage",
+        "get",
+        "pdisks:",
+        get_boss_disks()[device],
+    )
+
+    return __re_multiline_first(boss_data, regex[prop]).strip()
 
 
 def __re_multiline_first(data, regex_c):
