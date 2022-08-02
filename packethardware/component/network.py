@@ -9,13 +9,11 @@ class Network(Component):
     def list(cls, lshw):
         xpath = etree.XPath("//node[@class='network'][@handle!=''][logicalname]")
 
-        networks = []
-        for network in xpath(lshw):
-            if utils.xml_ev(lshw, network, "logicalname") == "bond0":
-                continue
-            networks.append(cls(lshw, network))
-
-        return networks
+        return [
+            cls(lshw, network)
+            for network in xpath(lshw)
+            if utils.xml_ev(lshw, network, "logicalname") != "bond0"
+        ]
 
     def __init__(self, lshw, element):
         Component.__init__(self, lshw, element)
@@ -39,10 +37,11 @@ class Network(Component):
             lshw, element, "configuration/setting[@id='firmware']/@value", True
         )
 
-        if not utils.xml_ev(lshw, element, "businfo") == "":
-            self.pci_id = utils.xml_ev(lshw, element, "businfo").split(":", 1)[1]
-        else:
-            self.pci_id = ""
+        self.pci_id = (
+            ""
+            if utils.xml_ev(lshw, element, "businfo") == ""
+            else utils.xml_ev(lshw, element, "businfo").split(":", 1)[1]
+        )
 
         if "Illegal Vendor ID" in self.vendor and self.pci_id != "":
             _lspci = utils.lspci(self.pci_id)
@@ -67,7 +66,7 @@ class Network(Component):
         if "Mellanox" not in self.vendor:
             return
 
-        _pci_id = "0000:" + self.pci_id
+        _pci_id = f"0000:{self.pci_id}"
 
         try:
             if not utils.mlxup_upgradable(_pci_id):

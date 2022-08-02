@@ -41,8 +41,4 @@ class Motherboard(Component):
     def list(cls, lshw):
         xpath = etree.XPath("/list/node/node[@id='core']")
 
-        motherboards = []
-        for motherboard in xpath(lshw):
-            motherboards.append(cls(lshw, motherboard))
-
-        return motherboards
+        return [cls(lshw, motherboard) for motherboard in xpath(lshw)]

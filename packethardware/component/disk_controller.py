@@ -33,22 +33,18 @@ class DiskController(Component):
                 "bbu",
                 "memory_size",
             ):
-                self.data["megaraid_" + prop] = utils.get_megaraid_prop(prop)
+                self.data[f"megaraid_{prop}"] = utils.get_megaraid_prop(prop)
 
     @classmethod
     def list(cls, lshw):
         xpath = etree.XPath("//node[@class='storage'][@handle!='']")
 
-        disk_controllers = []
-        for disk_controller in xpath(lshw):
-            if (
-                utils.xml_ev(lshw, disk_controller, "description")
-                == "Non-Volatile memory controller"
-            ):
-                continue
-
-            disk_controllers.append(cls(lshw, disk_controller))
-        return disk_controllers
+        return [
+            cls(lshw, disk_controller)
+            for disk_controller in xpath(lshw)
+            if utils.xml_ev(lshw, disk_controller, "description")
+            != "Non-Volatile memory controller"
+        ]
 
     def update(self, _facility="lab1"):
         if self.vendor != "LSI Logic" or self.model.startswith("SAS3008"):
