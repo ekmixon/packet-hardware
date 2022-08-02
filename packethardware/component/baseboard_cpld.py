@@ -32,6 +32,4 @@ class BaseboardCPLD(Component):
 
     @classmethod
     def list(cls, _):
-        cpld = []
-        cpld.append(cls())
-        return cpld
+        return [cls()]

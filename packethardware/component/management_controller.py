@@ -25,7 +25,7 @@ class ManagementController(Component):
                 utils.log(message="Something went wrong, probably no ipmitool.")
                 self.firmware_version = ""
         else:
-            self.name = self.model + " Base Management Controller"
+            self.name = f"{self.model} Base Management Controller"
 
         self.vendor = utils.normalize_vendor(utils.get_mc_info("vendor"))
         self.serial = utils.get_mc_info("guid")
@@ -34,6 +34,4 @@ class ManagementController(Component):
 
     @classmethod
     def list(cls, _):
-        bmcs = []
-        bmcs.append(cls())
-        return bmcs
+        return [cls()]

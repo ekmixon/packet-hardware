@@ -7,14 +7,12 @@ from .. import utils
 class Disk(Component):
     @classmethod
     def list(cls, _):
-        disks = []
-        for disk in utils.lsblk():
-            if not disk["name"].startswith("/dev/sd") and not disk["name"].startswith(
-                "/dev/nvme"
-            ):
-                continue
-            disks.append(cls(disk))
-        return disks
+        return [
+            cls(disk)
+            for disk in utils.lsblk()
+            if disk["name"].startswith("/dev/sd")
+            or disk["name"].startswith("/dev/nvme")
+        ]
 
     def __init__(self, lsblk):
         Component.__init__(self, lsblk, None)
@@ -30,11 +28,10 @@ class Disk(Component):
         else:
             self.data["smart"] = utils.get_smart_attributes(self.lsblk["name"])
 
-        match = re.search(r"^(\S+)_(\S+_\S+)", self.__getter("model"))
-        if match:
-            self.vendor = match.group(1)
+        if match := re.search(r"^(\S+)_(\S+_\S+)", self.__getter("model")):
+            self.vendor = match[1]
             self.model = self.lsblk["model"]
-            self.name = match.group(1) + " " + match.group(2)
+            self.name = match[1] + " " + match[2]
         else:
             self.model = self.__getter("model")
             self.name = self.model

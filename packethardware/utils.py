@@ -12,9 +12,7 @@ from lxml import etree
 
 
 def http_download_file(_uri, _fh, _hash):
-    _response = http_request(_uri)
-
-    if _response:
+    if _response := http_request(_uri):
         _chunk = 16 * 1024
         _sha512 = hashlib.sha512()
 
@@ -55,14 +53,11 @@ def xml_ev(t, e, v, is_attrib=False):
     value = []
 
     if is_attrib:
-        value = t.xpath(t.getpath(e) + "/" + v)
+        value = t.xpath(f"{t.getpath(e)}/{v}")
     else:
-        value = t.xpath(t.getpath(e) + "/" + v + "/text()")
+        value = t.xpath(f"{t.getpath(e)}/{v}/text()")
 
-    if len(value) == 1:
-        return value[0]
-    else:
-        return ""
+    return value[0] if len(value) == 1 else ""
 
 
 def cmd_output(*cmd):
@@ -70,9 +65,7 @@ def cmd_output(*cmd):
 
     process = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     out, err = process.communicate()
-    retcode = process.poll()
-
-    if retcode:
+    if retcode := process.poll():
         log(cmd=cmd[0], errorcode=retcode)
         return ""
 
@@ -82,7 +75,7 @@ def cmd_output(*cmd):
 def ethtool_mac(interface_name):
     out = cmd_output("ethtool", "-P", interface_name)
     match = re.match(r"Permanent address: (.*)", out)
-    return match.group(1)
+    return match[1]
 
 
 def lsblk():
@@ -96,10 +89,11 @@ def get_smart_devices():
     smart_data = cmd_output("smartctl", "--scan-open")
     smart_map = {}
 
-    disks = []
-    for file in os.listdir("/dev"):
-        if re.compile("^sd[a-z]$").match(file):
-            disks.append(os.path.join("/dev", file))
+    disks = [
+        os.path.join("/dev", file)
+        for file in os.listdir("/dev")
+        if re.compile("^sd[a-z]$").match(file)
+    ]
 
     counter = 0
 
@@ -108,7 +102,7 @@ def get_smart_devices():
         if comment_regex.match(line):
             continue
 
-        dev, _, disk_type = line.split(" ")[0:3]
+        dev, _, disk_type = line.split(" ")[:3]
 
         if "megaraid" not in disk_type:
             continue
@@ -152,10 +146,11 @@ def get_smart_attributes(device):
         "raw_value",
     )
 
-    for attr in attributes[start_line:]:
-        if len(attr) == 0:
-            continue
-        smart_attributes.append(dict(zip(attribute_keys, attr.split())))
+    smart_attributes.extend(
+        dict(zip(attribute_keys, attr.split()))
+        for attr in attributes[start_line:]
+        if len(attr) != 0
+    )
 
     return smart_attributes
 
@@ -211,10 +206,7 @@ def get_hdparm_diskprop(device, prop):
 def __re_multiline_first(data, regex_c):
     m = regex_c.search(data)
 
-    if m is not None:
-        return m.group(1)
-
-    return ""
+    return m.group(1) if m is not None else ""
 
 
 def get_megaraid_prop(prop):
@@ -246,9 +238,8 @@ def lspci(pci_id):
     _lspci = {}
 
     for _line in cmd_output("lspci", "-vmmQ", "-s", pci_id).splitlines():
-        _match = re.search(r"^(.+):\s+(.+)", _line)
-        if _match:
-            _lspci[_match.group(1).lower()] = _match.group(2)
+        if _match := re.search(r"^(.+):\s+(.+)", _line):
+            _lspci[_match[1].lower()] = _match[2]
 
     return _lspci
 
@@ -296,10 +287,8 @@ def mstflint_firmware_hash(pci_id):
 
 def mlxup_firmware(pci_id, firmware, _hash):
     with tempfile.NamedTemporaryFile() as _file:
-        _output = ""
-
-        if http_download_file(firmware, _file, _hash):
-            _output = cmd_output(
+        return (
+            cmd_output(
                 "/opt/mellanox/mlxup",
                 "-d",
                 pci_id,
@@ -308,8 +297,9 @@ def mlxup_firmware(pci_id, firmware, _hash):
                 "--no-progress",
                 "--yes",
             )
-
-        return _output
+            if http_download_file(firmware, _file, _hash)
+            else ""
+        )
 
 
 def mlxup_online(pci_id):
@@ -327,19 +317,13 @@ def mlxup_query(pci_id):
 def mlxup_upgradable(pci_id):
     tree = etree.ElementTree(etree.fromstring(mlxup_query(pci_id)))
 
-    if tree.xpath("/Devices/Device/Status/text()")[0] == "Update required":
-        return True
-
-    return False
+    return tree.xpath("/Devices/Device/Status/text()")[0] == "Update required"
 
 
 def mellanox_isdell(pci_id):
     _psid = get_mellanox_prop(pci_id, "psid")
 
-    if _psid.startswith("DEL"):
-        return True
-
-    return False
+    return bool(_psid.startswith("DEL"))
 
 
 def get_dmidecode_prop(handle, dmi_type, prop):
@@ -352,11 +336,10 @@ def get_dmidecode_prop(handle, dmi_type, prop):
         if handle != dmi_handle:
             continue
 
-        if prop == "type":
-            type_regex = re.compile(r"^\s*Type: (\S*)\n", re.MULTILINE)
-            return __re_multiline_first(body, type_regex).strip()
-        else:
+        if prop != "type":
             return "Unknown"
+        type_regex = re.compile(r"^\s*Type: (\S*)\n", re.MULTILINE)
+        return __re_multiline_first(body, type_regex).strip()
 
 
 def dmidecode_string(dmi_string):
@@ -368,11 +351,7 @@ def dmidecode(dmi_type):
 
 
 def log(*args, **kwargs):
-    m = ""
-
-    if args:
-        m = " ".join(args)
-
+    m = " ".join(args) if args else ""
     if kwargs:
         if "klass" not in kwargs:
             caller_locals = inspect.stack()[1][0].f_locals
@@ -439,12 +418,12 @@ def get_fru_info(prop, header="Builtin FRU Device"):
             return ""
         if not found_header:
             head = head_match.search(line)
-            if head and head.group(1) == header:
+            if head and head[1] == header:
                 found_header = True
         else:
             p = prop_match.search(line.strip())
-            if p and p.group(1) == prop:
-                return p.group(2)
+            if p and p[1] == prop:
+                return p[2]
     return ""
 
 

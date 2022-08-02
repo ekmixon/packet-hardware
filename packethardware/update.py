@@ -36,7 +36,7 @@ from .component import *
     help="Path to local json component store",
 )
 def update(component_type, tinkerbell, verbose, dry, cache_file):
-    component_types = [c + "Component" for c in component_type]
+    component_types = [f"{c}Component" for c in component_type]
 
     with open(cache_file, "r") as pickle_file:
         components = jsonpickle.decode(pickle_file.read())

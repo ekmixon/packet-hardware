@@ -13,6 +13,4 @@ class Chassis(Component):
 
     @classmethod
     def list(cls, _):
-        chassis = []
-        chassis.append(cls())
-        return chassis
+        return [cls()]
